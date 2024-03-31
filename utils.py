@@ -1,13 +1,17 @@
+import os
 from typing import Any, Iterable, List, Tuple, Union
-import rasterio
-from rasterio import features
+
 import geopandas as gpd
+import numpy as np
+import rasterio
+from freetype import *
+from PIL import Image, ImageDraw, ImageFont
+from rasterio import features
 from shapely import Point, Polygon
 from shapely.geometry.base import BaseGeometry
+from skimage.measure import marching_cubes
+from stl import mesh
 from tqdm.notebook import tqdm
-from PIL import Image, ImageFont, ImageDraw
-import numpy as np
-import os
 
 
 def load_raster_data(
@@ -75,8 +79,7 @@ def parse_geometries_to_rasterize_format(
 
         # Extract altitude values from the raster dataset for each coordinate.
         heights = [
-            altitude[0] + extrusion_height
-            for altitude in raster_dataset.sample(coords_list)
+            altitude[0] + extrusion_height for altitude in raster_dataset.sample(coords_list)
         ]
 
         # Extend the shapes list with a tuple for each coordinate, consisting of a
@@ -193,3 +196,74 @@ def extrude_text_in_raster(
         )
 
     return np.asarray(image)
+
+
+def extrude_text(
+    font_path: str,
+    text: str,
+    space_between_char: int = 10,
+    space_size: int = 40,
+    char_size: int = 10000,
+    extrusion_height: int = 100,
+) -> mesh.Mesh:
+    """
+    Extrudes a text into a 3D mesh.
+
+    Parameters
+    ----------
+    font_path : str
+        The path to the font file.
+    text : str
+        The text to extrude.
+    space_between_char : int, optional
+        The space between characters in pixels. Default is 10.
+    space_size : int, optional
+        The size of the space in pixels. Default is 40.
+    char_size : int, optional
+        The size of the characters in pixels. Default is 10000.
+    extrusion_height : int, optional
+        The height of the extrusion in meters. Default is 100.
+
+    Returns
+    -------
+    mesh.Mesh
+        The extruded 3D mesh.
+    """
+    face = Face(font_path)
+    face.set_char_size(char_size)
+
+    max_height, width = 0, 0
+    for char in text:
+        face.load_char(char)
+        slot = face.glyph
+        bitmap = slot.bitmap
+        max_height = max(max_height, bitmap.rows)
+        width += bitmap.width + (space_between_char if char != " " else space_size)
+
+    letter_xy = np.zeros((max_height, width), dtype=np.uint8)
+    start = 0
+    for i, char in enumerate(text):
+        if char == " ":
+            start += space_size
+            continue
+        face.load_char(char)
+        slot = face.glyph
+        bitmap = slot.bitmap
+        diff = (
+            max_height - bitmap.rows if not char in ["'"] else 0
+        )  # FIXME set different height start (CAPS, pjqg,lowercase, ')
+        letter_xy[diff : bitmap.rows + diff, start : start + bitmap.width] = np.array(
+            bitmap.buffer, dtype=np.uint8
+        ).reshape(bitmap.rows, bitmap.width)
+        start += bitmap.width + (
+            space_between_char if i + 1 < len(text) and text[i + 1] != " " else space_size
+        )
+
+    xyz = np.asarray([letter_xy for _ in range(30)]) * extrusion_height
+    xyz[-1] = 0
+    verts, faces, _, _ = marching_cubes(xyz)
+    obj3D = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, f in enumerate(faces):
+        obj3D.vectors[i] = verts[f]
+
+    return obj3D
