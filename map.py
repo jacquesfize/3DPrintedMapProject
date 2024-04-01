@@ -13,7 +13,6 @@ np.bool = np.bool_  # workaround for numpy bug
 
 
 class Map:
-
     def __init__(self, dem_filename: str = "", scale_factor: int = 1, data: dict = None):
         """
         Constructor for the Map class.
