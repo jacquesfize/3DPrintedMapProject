@@ -257,10 +257,16 @@ def extrude_text(
         # space_between_char if i + 1 < len(text) and text[i + 1] != " " else space_size
         # )
 
-    xyz = np.asarray([letter_xy for _ in range(extrusion_height)])
+    xyz = np.asarray([letter_xy for _ in range(4)])
     xyz[-1] = 0
-    verts, faces, _, _ = marching_cubes(xyz)
+    verts, faces, _, _ = marching_cubes(
+        xyz, spacing=[extrusion_height / 3, 1, 1]
+    )  # VOXEL dimension [z,y,x]
     obj3D = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, f in enumerate(faces):
         obj3D.vectors[i] = verts[f]
+
+    obj3D.rotate([0, 0, 1], np.deg2rad(90))
+    obj3D.rotate([1, 0, 0], np.deg2rad(90))
+    obj3D.rotate([0, 0, 1], np.deg2rad(90))
     return obj3D
