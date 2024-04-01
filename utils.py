@@ -37,7 +37,8 @@ def load_raster_data(
     AssertionError
         If the file does not exist.
     """
-    assert os.path.exists(filename)
+    if isinstance(filename, str):
+        assert os.path.exists(filename)
 
     raster_dataset = rasterio.open(filename)
     if return_band1:
