@@ -16,7 +16,7 @@ from tqdm.notebook import tqdm
 
 def load_raster_data(
     filename: str, return_band1: bool = False
-) -> Union[Tuple[rasterio.DatasetReader, np.ndarray], rasterio.DatasetReader]:
+):  # -> Union[Tuple[rasterio.DatasetReader, np.ndarray], rasterio.DatasetReader]:
     """
     Load raster data from a file.
 
@@ -249,21 +249,18 @@ def extrude_text(
         face.load_char(char)
         slot = face.glyph
         bitmap = slot.bitmap
-        diff = (
-            max_height - bitmap.rows if not char in ["'"] else 0
-        )  # FIXME set different height start (CAPS, pjqg,lowercase, ')
+        diff = max_height - bitmap.rows if not char in ["'"] else 0  # FIXME
         letter_xy[diff : bitmap.rows + diff, start : start + bitmap.width] = np.array(
             bitmap.buffer, dtype=np.uint8
         ).reshape(bitmap.rows, bitmap.width)
-        start += bitmap.width + (
-            space_between_char if i + 1 < len(text) and text[i + 1] != " " else space_size
-        )
+        start += bitmap.width  # FIXME + (
+        # space_between_char if i + 1 < len(text) and text[i + 1] != " " else space_size
+        # )
 
-    xyz = np.asarray([letter_xy for _ in range(30)]) * extrusion_height
+    xyz = np.asarray([letter_xy for _ in range(extrusion_height)])
     xyz[-1] = 0
     verts, faces, _, _ = marching_cubes(xyz)
     obj3D = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, f in enumerate(faces):
         obj3D.vectors[i] = verts[f]
-
     return obj3D
