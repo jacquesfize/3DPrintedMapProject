@@ -21,16 +21,23 @@ An example on how to produce 3D map with the current code
 
 from map import Map
 import geopandas as gpd
+from stl import mesh # numpy-stl
 
 map3D = Map("data.tif",scale_factor=0.5)
 
-randos = gpd.read_file('randos.geojson')
-randos = randos.explode()
+randos = gpd.read_file('randos.geojson') # must be use the same projection as the raster
+randos = randos.explode() # do not works with MultiLineString... explode() transform them into multiple LineString
 
-# For now, geom must be done before text
+# Extrude geometry on the raster
 map3D = map3D.add_geometry(randos, 10000)
+# Create a 3d object from a text and a given font file
 map3D = map3D.add_text("placename", *(lat,lon), "fonts.ttf")
+# Include mesh (use numpy-stl Mesh object) at coordinates lon=0 lat=0 (in the raster projection)
+map3D = map3D.add_mesh(mesh.Mesh.from_file("test.stl"), 0, 0)
 
+# To generate the final mesh
+final_mesh = map3D.generate_mesh()
 
-map3D.save("testtext+geom.stl")
+# To save the final mesh (the method call automatically calls the `generate_mesh()` method)
+map3D.save("saveFile.stl")
 ```
