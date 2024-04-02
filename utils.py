@@ -271,3 +271,31 @@ def extrude_text(
     obj3D.rotate([1, 0, 0], np.deg2rad(90))
     obj3D.rotate([0, 0, 1], np.deg2rad(90))
     return obj3D
+
+
+def scale_mesh(mesh_to_scale, desired_width):
+    """
+    Scales the given mesh to have the specified desired width.
+
+    Parameters
+    ----------
+    mesh : mesh.Mesh
+        The mesh to be scaled.
+    desired_width : float
+        The desired width of the output mesh.
+
+    Returns
+    -------
+    mesh.Mesh
+        The scaled mesh.
+    """
+    new_mesh = mesh.Mesh(mesh_to_scale.data.copy())
+    new_mesh.translate(-new_mesh.min_)
+    new_mesh.update_min()
+
+    scale_factor = desired_width / new_mesh.max_[0]
+    new_mesh.x *= scale_factor
+    new_mesh.y *= scale_factor
+    new_mesh.z *= scale_factor
+
+    return new_mesh
