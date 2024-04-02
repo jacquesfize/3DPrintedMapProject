@@ -43,6 +43,8 @@ class Map:
                 self.scale_raster(scale_factor)
 
             self.map_mesh = self.compute_dem_mesh()
+
+            self.meshs = []
         else:
             self.load_from_data(data)
 
@@ -53,6 +55,7 @@ class Map:
             data=dict(
                 map_mesh=mesh.Mesh(self.map_mesh.data.copy()),
                 raster=self.copy_raster(),
+                meshs=[mesh.Mesh(mesh_.data.copy()) for mesh_ in self.meshs],
             )
         )
 
@@ -68,6 +71,7 @@ class Map:
 
             - map_mesh: A mesh.Mesh instance representing the map mesh.
             - raster: A rasterio.Dataset instance representing the raster.
+            - meshs: A list of mesh.Mesh combined with the map mesh.
 
         Notes
         -----
@@ -77,6 +81,7 @@ class Map:
         self.map_mesh = data["map_mesh"]
         self.raster = data["raster"]
         self.dem_band = self.raster.read(1)
+        self.meshs = data["meshs"]
 
     def copy_raster(self):
         """
@@ -169,7 +174,13 @@ class Map:
         return map3d
 
     def add_text(
-        self, text: str, x: float, y: float, fonts_file: str, inplace: bool = False
+        self,
+        text: str,
+        x: float,
+        y: float,
+        fonts_file: str,
+        inplace: bool = False,
+        text_width: int = 100,
     ) -> "Map":
         """
         Adds text to the map mesh.
@@ -186,14 +197,14 @@ class Map:
             The path to the font file.
         inplace : bool, optional
             If True, the text is added to the map mesh inplace, by default False.
-
+        text_width : int, optional
+            text width in the map mesh, by default 100
         Returns
         -------
         Map
             The updated map with the added text.
         """
         altitude = list(self.raster.sample([(x, y)], 1))[0][0]
-        band = self.dem_band
         text_3D = extrude_text(
             font_path=fonts_file,
             text=text,
@@ -207,14 +218,13 @@ class Map:
         text_3D.update_min()
 
         # scale text to a given width
-        wanted_width = mmax_x / 15
-        scale_factor = wanted_width / tmax_x
+        scale_factor = text_width / tmax_x
         text_3D.x *= scale_factor
         text_3D.y *= scale_factor
 
         # scale text to a given altitude
         altitude = int(
-            (altitude / band.max()) * self.map_mesh.max_[2]
+            (altitude / self.dem_band.max()) * self.map_mesh.max_[2]
         )  # scale altitude to max z position in the map mesh
         scale_factor_z = altitude / tmax_z
         text_3D.z *= scale_factor_z
@@ -225,14 +235,48 @@ class Map:
         text_3D.translate([y, mmax_y - x, mmax_z / 15])
 
         if inplace:
-            self.map_mesh = mesh.Mesh(
-                np.concatenate([text_3D.data.copy(), self.map_mesh.data.copy()])
-            )
+            self.meshs.append(text_3D)
         else:
             new_Map = self.copy()
-            new_Map.map_mesh = mesh.Mesh(
-                np.concatenate([text_3D.data.copy(), self.map_mesh.data.copy()])
-            )
+            new_Map.meshs.append(text_3D)
+            return new_Map
+
+    def add_mesh(self, mesh_to_add: mesh.Mesh, x: float, y: float, inplace: bool = False) -> "Map":
+        """
+        Adds a mesh to the map mesh at a given world coordinate.
+
+        Parameters
+        ----------
+        mesh_to_add : mesh.Mesh
+            The mesh to be added.
+        x : float
+            The x-coordinate of the mesh in the world coordinates.
+        y : float
+            The y-coordinate of the mesh in the world coordinates.
+        inplace : bool, optional
+            If True, the mesh is added to the map mesh inplace, by default False.
+
+        Returns
+        -------
+        Map
+            The updated Map with the added mesh.
+        """
+        altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+        x, y = self.raster.index(x, y)
+        mmax_x, mmax_y, mmax_z = self.map_mesh.max_
+        # scale text to a given altitude
+        altitude = int((altitude / self.dem_band.max()) * mmax_z)
+        mesh_to_add = mesh.Mesh(mesh_to_add.data.copy())
+        mesh_to_add.translate(-mesh_to_add.min_)
+        mesh_to_add.update_min()
+
+        mesh_to_add.translate([y, mmax_y - x, altitude])
+
+        if inplace:
+            self.meshs.append(mesh_to_add)
+        else:
+            new_Map = self.copy()
+            new_Map.meshs.append(mesh_to_add)
             return new_Map
 
     def add_geometry(
@@ -279,6 +323,13 @@ class Map:
         """
         self.raster.close()
 
+    def generate_mesh(self):
+        return mesh.Mesh(
+            np.concatenate(
+                [*(mesh_.data.copy() for mesh_ in self.meshs), self.map_mesh.data.copy()]
+            )
+        )
+
     def save(self, filename: str):
         """
         Save the map mesh to a file.
@@ -288,4 +339,4 @@ class Map:
         filename : str
             The name of the file to save to
         """
-        self.map_mesh.save(filename)
+        self.generate_mesh().save(filename)
