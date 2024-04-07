@@ -1,4 +1,5 @@
 import atexit
+from typing import Optional
 
 import gemgis as gg
 import geopandas as gpd
@@ -7,9 +8,8 @@ import rasterio
 from rasterio import features
 from rasterio.enums import Resampling
 from stl import mesh
-from utils import extrude_geometries, extrude_text, load_raster_data
-
-np.bool = np.bool_  # workaround for numpy bug
+from utils import extrude_geometries, extrude_text, load_raster_data, parse_Mesh_to_PolyData
+from basic_mesh import generate_cube
 
 
 class Map:
@@ -191,6 +191,7 @@ class Map:
         text_width: int = 100,
         not_world_coords=False,
         custom_altitude=None,
+        **kwargs_extrude_text
     ) -> "Map":
         """
         Adds text to the map mesh.
@@ -219,9 +220,7 @@ class Map:
         else:
             altitude = custom_altitude
         text_3D = extrude_text(
-            font_path=fonts_file,
-            text=text,
-            extrusion_height=30,
+            font_path=fonts_file, text=text, extrusion_height=30, **kwargs_extrude_text
         )
         tmax_x, tmax_y, tmax_z = text_3D.max_
         mmax_x, mmax_y, mmax_z = self.map_mesh.max_
@@ -263,6 +262,7 @@ class Map:
         y: float,
         inplace: bool = False,
         not_world_coords=False,
+        altitude_change_value=0,
     ) -> "Map":
         """
         Adds a mesh to the map mesh at a given world coordinate.
@@ -286,6 +286,7 @@ class Map:
             The updated Map with the added mesh.
         """
         altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+        altitude += altitude_change_value
         if not not_world_coords:
             x, y = self.raster.index(x, y)
         mmax_x, mmax_y, mmax_z = self.map_mesh.max_
@@ -346,18 +347,70 @@ class Map:
             )
             return new_Map
 
+    def add_plateau(self, height: int, inplace: bool = False) -> Optional["Map"]:
+        """
+        Adds a plateau mesh to the map.
+
+        Parameters
+        ----------
+        height : int
+            The height of the plateau in millimeters.
+        inplace : bool, optional
+            Whether to update the map mesh in place, by default False.
+
+        Returns
+        -------
+        Optional[Map]
+            A new Map instance if `inplace` is False, None otherwise.
+        """
+        # create a cube as a plateau mesh
+        plateau = generate_cube(int(self.map_mesh.max_[0]))
+
+        # scale the plateau mesh to desired height
+        desired_height = 5  # mm
+        plateau.z *= desired_height / plateau.z.max()
+
+        # scale the plateau mesh to match the map mesh y dimension
+        plateau.y *= self.map_mesh.max_[1] / plateau.y.max()
+
+        # translate the plateau mesh to the desired height
+        plateau.translate([0, 0, -height])
+
+        if inplace:
+            # append the plateau mesh to the map meshes if inplace is True
+            self.meshs.append(plateau)
+        else:
+            # create a new map instance, append the plateau mesh to its meshes, and return it
+            new_Map = self.copy()
+            new_Map.meshs.append(plateau)
+            return new_Map
+
     def cleanup(self):
         """
         Close the raster file.
         """
         self.raster.close()
 
-    def generate_mesh(self):
+    def generate_mesh(self) -> mesh.Mesh:
+        """
+        Generate a mesh by concatenating the meshes of the map and its plates.
+
+        Returns
+        -------
+        mesh.Mesh
+            A new mesh containing the data of all the meshes of the map and its plates.
+        """
         return mesh.Mesh(
             np.concatenate(
                 [*(mesh_.data.copy() for mesh_ in self.meshs), self.map_mesh.data.copy()]
             )
         )
+
+    def toPolyData(self):
+        """
+        Parse the mesh to a pyvista PolyData object.
+        """
+        return parse_Mesh_to_PolyData(self.generate_mesh())
 
     def save(self, filename: str):
         """
@@ -368,7 +421,7 @@ class Map:
         filename : str
             The name of the file to save to
         """
-        self.generate_mesh().save(filename)
+        self.toPolyData().save(filename)
 
     def clean_meshs(self):
         """
@@ -377,13 +430,7 @@ class Map:
         self.meshs = []
 
     def plot(self):
-        import pyvista as pv
-
-        _mesh = self.generate_mesh()
-        points = _mesh.vectors.reshape(-1, 3)
-        faces = np.arange(points.shape[0], dtype=np.uint32).reshape(-1, 3)
-        faces = np.hstack(
-            [(np.ones(len(faces), dtype=np.uint32) * 3).reshape(-1, 1), faces], dtype=np.uint32
-        )
-        cloud = pv.PolyData(points, faces)
-        cloud.plot(cpos="xy")
+        """
+        Plot the map mesh.
+        """
+        self.toPolyData().plot(cpos="xy")
