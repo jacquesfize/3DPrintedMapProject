@@ -13,7 +13,7 @@ In a nutshell :
 - Use `pyvista`, `gemgis`, and `numpy-stl` to transform DEM into a 3D mesh
 - Use `numpy-stl` to save the final result
 
-## Code Example
+## Get Started
 
 An example on how to produce 3D map with the current code
 
@@ -41,3 +41,15 @@ final_mesh = map3D.generate_mesh()
 # To save the final mesh (the method call automatically calls the `generate_mesh()` method)
 map3D.save("saveFile.stl")
 ```
+
+## Final render example
+
+![example](docs/images/plot_ecrins.png)
+
+## Todo
+
+- Be able to clip mesh generated and to print the clipped meshes
+- Stabilize text extrusion
+- Rename map.py to avoid confusion with `map` in python
+- Generate a setup.py file
+- Write a better documentation
