@@ -13,7 +13,13 @@ np.bool = np.bool_  # workaround for numpy bug
 
 
 class Map:
-    def __init__(self, dem_filename: str = "", scale_factor: int = 1, data: dict = None):
+    def __init__(
+        self,
+        dem_filename: str = "",
+        scale_factor: int = 1,
+        data: dict = None,
+        elevation_scale: float = 0.02,
+    ):
         """
         Constructor for the Map class.
 
@@ -25,7 +31,8 @@ class Map:
             The scale factor to apply to the DEM. Default is 1.
         data : dict, optional
             Dictionary containing the data to load. Default is None.
-
+        elevation_scale : float, optional
+            The scale factor to apply to the elevation values. Defaults to 0.02.
         Notes
         -----
         If `data` is not None, it calls `load_from_data(data)`.
@@ -42,9 +49,10 @@ class Map:
             if scale_factor != 1:
                 self.scale_raster(scale_factor)
 
-            self.map_mesh = self.compute_dem_mesh()
+            self.map_mesh = self.compute_dem_mesh(elevation_scale=elevation_scale)
 
             self.meshs = []
+            self.elevation_scale = elevation_scale
         else:
             self.load_from_data(data)
 
@@ -181,6 +189,8 @@ class Map:
         fonts_file: str,
         inplace: bool = False,
         text_width: int = 100,
+        not_world_coords=False,
+        custom_altitude=None,
     ) -> "Map":
         """
         Adds text to the map mesh.
@@ -204,7 +214,10 @@ class Map:
         Map
             The updated map with the added text.
         """
-        altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+        if not custom_altitude:
+            altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+        else:
+            altitude = custom_altitude
         text_3D = extrude_text(
             font_path=fonts_file,
             text=text,
@@ -230,7 +243,9 @@ class Map:
         text_3D.z *= scale_factor_z
 
         # get the x,y raster coords from the world coords
-        x, y = self.raster.index(x, y)
+        if not not_world_coords:
+            x, y = self.raster.index(x, y)
+            print(1)
         # move the text to the given coordinates
         text_3D.translate([y, mmax_y - x, mmax_z / 15])
 
@@ -241,7 +256,14 @@ class Map:
             new_Map.meshs.append(text_3D)
             return new_Map
 
-    def add_mesh(self, mesh_to_add: mesh.Mesh, x: float, y: float, inplace: bool = False) -> "Map":
+    def add_mesh(
+        self,
+        mesh_to_add: mesh.Mesh,
+        x: float,
+        y: float,
+        inplace: bool = False,
+        not_world_coords=False,
+    ) -> "Map":
         """
         Adds a mesh to the map mesh at a given world coordinate.
 
@@ -255,6 +277,8 @@ class Map:
             The y-coordinate of the mesh in the world coordinates.
         inplace : bool, optional
             If True, the mesh is added to the map mesh inplace, by default False.
+        not_world_coords : bool, optional
+            If True, the mesh is added to the map mesh in the raster coordinates, by default False
 
         Returns
         -------
@@ -262,7 +286,8 @@ class Map:
             The updated Map with the added mesh.
         """
         altitude = list(self.raster.sample([(x, y)], 1))[0][0]
-        x, y = self.raster.index(x, y)
+        if not not_world_coords:
+            x, y = self.raster.index(x, y)
         mmax_x, mmax_y, mmax_z = self.map_mesh.max_
         # scale text to a given altitude
         altitude = int((altitude / self.dem_band.max()) * mmax_z)
@@ -311,10 +336,14 @@ class Map:
             geometry_dataframe, self.raster, self.dem_band, extrusion_height, **kwargs
         )
         if inplace:
-            self.map_mesh = self.compute_dem_mesh(raster_band=new_band)
+            self.map_mesh = self.compute_dem_mesh(
+                raster_band=new_band, elevation_scale=self.elevation_scale
+            )
         else:
             new_Map = self.copy()
-            new_Map.map_mesh = self.compute_dem_mesh(raster_band=new_band)
+            new_Map.map_mesh = self.compute_dem_mesh(
+                raster_band=new_band, elevation_scale=self.elevation_scale
+            )
             return new_Map
 
     def cleanup(self):
@@ -340,3 +369,21 @@ class Map:
             The name of the file to save to
         """
         self.generate_mesh().save(filename)
+
+    def clean_meshs(self):
+        """
+        Method to clean the meshs list by setting it to an empty list.
+        """
+        self.meshs = []
+
+    def plot(self):
+        import pyvista as pv
+
+        _mesh = self.generate_mesh()
+        points = _mesh.vectors.reshape(-1, 3)
+        faces = np.arange(points.shape[0], dtype=np.uint32).reshape(-1, 3)
+        faces = np.hstack(
+            [(np.ones(len(faces), dtype=np.uint32) * 3).reshape(-1, 1), faces], dtype=np.uint32
+        )
+        cloud = pv.PolyData(points, faces)
+        cloud.plot(cpos="xy")
