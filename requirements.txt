@@ -4,7 +4,7 @@ numpy
 geopandas
 pillow
 tqdm
-mapa
 scikit-image
 numpy-stl
 freetype-py
+gemgis
