@@ -3,6 +3,7 @@ from typing import Any, Iterable, List, Tuple, Union
 
 import geopandas as gpd
 import numpy as np
+import pyvista as pv
 import rasterio
 from freetype import *
 from PIL import Image, ImageDraw, ImageFont
@@ -238,7 +239,7 @@ def extrude_text(
         face.load_char(char)
         slot = face.glyph
         bitmap = slot.bitmap
-        max_height = max(max_height, bitmap.rows)
+        max_height = max(max_height, bitmap.rows + 10)
         width += bitmap.width + (space_between_char if char != " " else space_size)
 
     letter_xy = np.zeros((max_height, width), dtype=np.uint8)
@@ -299,3 +300,13 @@ def scale_mesh(mesh_to_scale, desired_width):
     new_mesh.z *= scale_factor
 
     return new_mesh
+
+
+def parse_Mesh_to_PolyData(_mesh: mesh.Mesh) -> pv.PolyData:
+    points = _mesh.vectors.reshape(-1, 3)
+    faces = np.arange(points.shape[0], dtype=np.uint32).reshape(-1, 3)
+    faces = np.hstack(
+        [(np.ones(len(faces), dtype=np.uint32) * 3).reshape(-1, 1), faces], dtype=np.uint32
+    )
+    cloud = pv.PolyData(points, faces)
+    return cloud
