@@ -201,11 +201,9 @@ def extrude_text_in_raster(
 
 
 def extrude_text(
-    font_path: str,
     text: str,
-    space_between_char: int = 10,
-    space_size: int = 40,
-    char_size: int = 10000,
+    font_path: str,
+    font_size: int = 40,
     extrusion_height: int = 100,
 ) -> mesh.Mesh:
     """
@@ -231,39 +229,17 @@ def extrude_text(
     mesh.Mesh
         The extruded 3D mesh.
     """
-    face = Face(font_path)
-    face.set_char_size(char_size)
+    fnt = ImageFont.truetype(font_path, font_size)
+    _, _, w, h = fnt.getbbox(text)
+    text_image = Image.new("L", (w, h), 0)
+    modifier = ImageDraw.Draw(text_image)
+    modifier.text((0, 0), text, font=fnt, fill=255)
+    letter_image_matrix = np.asarray(text_image)
 
-    max_height, width = 0, 0
-    for char in text:
-        face.load_char(char)
-        slot = face.glyph
-        bitmap = slot.bitmap
-        max_height = max(max_height, bitmap.rows + 10)
-        width += bitmap.width + (space_between_char if char != " " else space_size)
-
-    letter_xy = np.zeros((max_height, width), dtype=np.uint8)
-    start = 0
-    for i, char in enumerate(text):
-        if char == " ":
-            start += space_size
-            continue
-        face.load_char(char)
-        slot = face.glyph
-        bitmap = slot.bitmap
-        diff = max_height - bitmap.rows if not char in ["'"] else 0  # FIXME
-        letter_xy[diff : bitmap.rows + diff, start : start + bitmap.width] = np.array(
-            bitmap.buffer, dtype=np.uint8
-        ).reshape(bitmap.rows, bitmap.width)
-        start += bitmap.width  # FIXME + (
-        # space_between_char if i + 1 < len(text) and text[i + 1] != " " else space_size
-        # )
-
-    xyz = np.asarray([letter_xy for _ in range(4)])
+    xyz = np.asarray([letter_image_matrix for _ in range(5)])
     xyz[-1] = 0
-    verts, faces, _, _ = marching_cubes(
-        xyz, spacing=[extrusion_height / 3, 1, 1]
-    )  # VOXEL dimension [z,y,x]
+    xyz[0] = 0
+    verts, faces, _, _ = marching_cubes(xyz, spacing=[extrusion_height / 3, 1, 1])
     obj3D = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
     for i, f in enumerate(faces):
         obj3D.vectors[i] = verts[f]
