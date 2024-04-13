@@ -429,8 +429,8 @@ class Map:
         """
         self.meshs = []
 
-    def plot(self):
+    def plot(self, **kwargs):
         """
         Plot the map mesh.
         """
-        self.toPolyData().plot(cpos="xy")
+        self.toPolyData().plot(**kwargs)
