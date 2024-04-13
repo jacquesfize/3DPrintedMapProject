@@ -10,6 +10,13 @@ from rasterio.enums import Resampling
 from stl import mesh
 from utils import extrude_geometries, extrude_text, load_raster_data, parse_Mesh_to_PolyData
 from basic_mesh import generate_cube
+import mapa
+
+
+class SIZE:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 
 class Map:
@@ -151,7 +158,7 @@ class Map:
         self.dem_band = band
 
     def compute_dem_mesh(
-        self, elevation_scale: float = 0.02, raster_band: np.ndarray = None
+        self, elevation_scale: float = 0.02, raster_band: np.ndarray = None, **mapa_kwargs
     ) -> mesh.Mesh:
         """
         Compute a mesh from the DEM (Digital Elevation Model).
@@ -166,20 +173,23 @@ class Map:
             A mesh object representing the 3D mesh of the DEM.
         """
         band = self.raster.read(1) if not isinstance(raster_band, np.ndarray) else raster_band
-        grid = (
-            gg.visualization.create_dem_3d(
-                dem=band * elevation_scale, extent=[0, band.shape[1], 0, band.shape[0]], res=1
-            )
-            .extract_geometry()
-            .triangulate()
+        desired_size = mapa_kwargs.get("desired_size", SIZE(*band.shape))
+
+        faces = mapa.compute_all_triangles(
+            band,
+            desired_size=desired_size,
+            elevation_scale=elevation_scale,
+            z_scale=1,
+            z_offset=4,
+            **mapa_kwargs
         )
-        assert grid.is_all_triangles
-        faces = grid.faces.reshape(-1, 4)[:, 1:4]
-        points = grid.points
-        map3d = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-        for i, f in enumerate(faces):
-            map3d.vectors[i] = points[f]
-        return map3d
+        map3D_object = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+        for i, face in enumerate(faces):
+            map3D_object.vectors[i] = face
+        map3D_object.rotate([0, 0, 1], np.deg2rad(90))
+        map3D_object.translate(-map3D_object.min_)
+        map3D_object.update_min()
+        return map3D_object
 
     def add_text(
         self,
