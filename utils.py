@@ -231,9 +231,10 @@ def extrude_text(
     """
     fnt = ImageFont.truetype(font_path, font_size)
     _, _, w, h = fnt.getbbox(text)
-    text_image = Image.new("L", (w, h), 0)
+    margin = (w // 5, h // 5)
+    text_image = Image.new("L", (w + margin[0] * 2, h + margin[1] * 2), 0)
     modifier = ImageDraw.Draw(text_image)
-    modifier.text((0, 0), text, font=fnt, fill=255)
+    modifier.text(margin, text, font=fnt, fill=255, stroke_width=4)
     letter_image_matrix = np.asarray(text_image)
 
     xyz = np.asarray([letter_image_matrix for _ in range(5)])
@@ -247,7 +248,14 @@ def extrude_text(
     obj3D.rotate([0, 0, 1], np.deg2rad(90))
     obj3D.rotate([1, 0, 0], np.deg2rad(90))
     obj3D.rotate([0, 0, 1], np.deg2rad(90))
+    obj3D = clean_mesh(obj3D)
     return obj3D
+
+
+def clean_mesh(_mesh: mesh.Mesh, radius: int = 1000) -> mesh.Mesh:
+    mesh_pyvista = parse_Mesh_to_PolyData(_mesh)
+    mesh_pyvista = mesh_pyvista.fill_holes(radius)
+    return parsePolydata_to_Mesh(mesh_pyvista)
 
 
 def scale_mesh(mesh_to_scale, desired_width):
@@ -286,3 +294,13 @@ def parse_Mesh_to_PolyData(_mesh: mesh.Mesh) -> pv.PolyData:
     )
     cloud = pv.PolyData(points, faces)
     return cloud
+
+
+def parsePolydata_to_Mesh(_polydata: pv.PolyData) -> mesh.Mesh:
+    _polydata = _polydata.triangulate()
+    faces = _polydata.faces.reshape(-1, 4)[:, 1:4]
+    points = _polydata.points
+    map3d = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, f in enumerate(faces):
+        map3d.vectors[i] = points[f]
+    return map3d
