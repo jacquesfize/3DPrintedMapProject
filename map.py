@@ -199,8 +199,9 @@ class Map:
         fonts_file: str,
         inplace: bool = False,
         text_width: int = 100,
-        not_world_coords=False,
+        raster_coords=False,
         custom_altitude=None,
+        epsg_src=None,
         **kwargs_extrude_text
     ) -> "Map":
         """
@@ -219,14 +220,23 @@ class Map:
         inplace : bool, optional
             If True, the text is added to the map mesh inplace, by default False.
         text_width : int, optional
-            text width in the map mesh, by default 100
+            The width of the text in the map mesh, by default 100.
+        raster_coords : bool, optional
+            If True, the text is added to the map mesh in the raster coordinates, by default False.
+        custom_altitude : float, optional
+            The altitude at which the text should be added, by default None.
+        epsg_src : str, optional
+            The EPSG code of the coordinate system in which the x and y coordinates are given, by default None.
+        **kwargs_extrude_text
+            Additional keyword arguments to be passed to the extrude_text function.
+
         Returns
         -------
         Map
             The updated map with the added text.
         """
         if not custom_altitude:
-            altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+            altitude = self.get_altitude((x, y), epsg_src=epsg_src)
         else:
             altitude = custom_altitude
         text_3D = extrude_text(
@@ -252,9 +262,8 @@ class Map:
         text_3D.z *= scale_factor_z
 
         # get the x,y raster coords from the world coords
-        if not not_world_coords:
-            x, y = self.raster.index(x, y)
-            print(1)
+        if not raster_coords:
+            x, y = self.realworld_to_raster_coords((x, y), epsg_src=epsg_src)
         # move the text to the given coordinates
         text_3D.translate([y, mmax_y - x, mmax_z / 15])
 
@@ -270,9 +279,11 @@ class Map:
         mesh_to_add: mesh.Mesh,
         x: float,
         y: float,
+        z: float = 0,
         inplace: bool = False,
-        not_world_coords=False,
+        raster_coords=False,
         altitude_change_value=0,
+        epsg_src: str = None,
     ) -> "Map":
         """
         Adds a mesh to the map mesh at a given world coordinate.
@@ -285,23 +296,30 @@ class Map:
             The x-coordinate of the mesh in the world coordinates.
         y : float
             The y-coordinate of the mesh in the world coordinates.
+        z : float, optional
+            The z-coordinate of the mesh in the world coordinates, by default 0. Ignored if raster_coords is False.
         inplace : bool, optional
             If True, the mesh is added to the map mesh inplace, by default False.
-        not_world_coords : bool, optional
-            If True, the mesh is added to the map mesh in the raster coordinates, by default False
+        raster_coords : bool, optional
+            If True, the mesh is added to the map mesh in the raster coordinates, by default False.
+        altitude_change_value : float, optional
+            The altitude change value in the map mesh, by default 0.
+        epsg_src : str, optional
+            The EPSG code of the coordinate system in which the x and y coordinates are given, by default None.
 
         Returns
         -------
         Map
             The updated Map with the added mesh.
         """
-        altitude = list(self.raster.sample([(x, y)], 1))[0][0]
+        altitude = z
+        if not raster_coords:
+            altitude = self.get_altitude((x, y), epsg_src=epsg_src)
         altitude += altitude_change_value
-        if not not_world_coords:
-            x, y = self.raster.index(x, y)
+        if not raster_coords:
+            x, y = self.realworld_to_raster_coords((x, y), epsg_src=epsg_src)
         mmax_x, mmax_y, mmax_z = self.map_mesh.max_
         # scale text to a given altitude
-        altitude = int((altitude / self.dem_band.max()) * mmax_z)
         mesh_to_add = mesh.Mesh(mesh_to_add.data.copy())
         mesh_to_add.translate(-mesh_to_add.min_)
         mesh_to_add.update_min()
