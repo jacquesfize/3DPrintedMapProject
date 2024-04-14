@@ -136,6 +136,10 @@ def extrude_geometries(
     assert isinstance(raster_band, np.ndarray)
     assert geom_column in gdf
 
+    # Reproject coordinates if CRS are different
+    if gdf != raster_dataset.crs:
+        gdf = gdf.to_crs(raster_dataset.crs)
+
     out_band = raster_band if in_place else raster_band.copy()
     shapes = parse_geometries_to_rasterize_format(
         raster_dataset=raster_dataset,
