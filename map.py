@@ -357,43 +357,73 @@ class Map:
             )
             return new_Map
 
-    def add_plateau(self, height: int, inplace: bool = False) -> Optional["Map"]:
+    def reproject_coords(
+        self, xy_coords: Tuple[float, float], epsg_src: str
+    ) -> Tuple[float, float]:
         """
-        Adds a plateau mesh to the map.
+        Transforms the given coordinates from `epsg_src` to the CRS of the raster.
 
         Parameters
         ----------
-        height : int
-            The height of the plateau in millimeters.
-        inplace : bool, optional
-            Whether to update the map mesh in place, by default False.
+        xy_coords : Tuple[float, float]
+            The coordinates to transform (lat,lon).
+        epsg_src : str
+            The EPSG code of the source CRS.
 
         Returns
         -------
-        Optional[Map]
-            A new Map instance if `inplace` is False, None otherwise.
+        Tuple[float, float]
+            The reprojected coordinates.
         """
-        # create a cube as a plateau mesh
-        plateau = generate_cube(int(self.map_mesh.max_[0]))
+        transformer = Transformer.from_crs(epsg_src, self.raster.crs)
+        return transformer.transform(xy_coords[1], xy_coords[0])
 
-        # scale the plateau mesh to desired height
-        desired_height = 5  # mm
-        plateau.z *= desired_height / plateau.z.max()
+    def realworld_to_raster_coords(
+        self, xy_coords: Tuple[float, float], epsg_src: str = None
+    ) -> Tuple[float, float]:
+        """
+        Returns the raster coordinates based on real world coordinates.
 
-        # scale the plateau mesh to match the map mesh y dimension
-        plateau.y *= self.map_mesh.max_[1] / plateau.y.max()
+        Parameters
+        ----------
+        xy_coords : Tuple[float, float]
+            The real world coordinates of the point.
+        epsg_src : str, optional
+            The EPSG code of the coordinate reference system of the point.
+            If `epsg_src` is given, `xy_coords` will be reprojected.
+            Default is None.
 
-        # translate the plateau mesh to the desired height
-        plateau.translate([0, 0, -height])
+        Returns
+        -------
+        Tuple[float, float]
+            The raster coordinates of the point.
+        """
+        if epsg_src is not None:
+            xy_coords = self.reproject_coords(xy_coords, epsg_src)
+        return self.raster.index(*xy_coords)
 
-        if inplace:
-            # append the plateau mesh to the map meshes if inplace is True
-            self.meshs.append(plateau)
-        else:
-            # create a new map instance, append the plateau mesh to its meshes, and return it
-            new_Map = self.copy()
-            new_Map.meshs.append(plateau)
-            return new_Map
+    def get_altitude(self, xy_coords: Tuple[float, float], epsg_src: Any = None) -> float:
+        """
+        Returns the altitude (elevation) of a point.
+
+        Parameters
+        ----------
+        xy_coords : Tuple[float, float]
+            The real world coordinates of the point.
+        epsg_src : str, optional
+            The EPSG code of the coordinate reference system of the point.
+            If `epsg_src` is given, `xy_coords` will be reprojected.
+            Default is None.
+
+        Returns
+        -------
+        float
+            The altitude of the point.
+        """
+        if epsg_src:
+            xy_coords = self.reproject_coords(xy_coords, epsg_src)
+        altitude = list(self.raster.sample([xy_coords], 1))[0][0] + self.height_plateau
+        return int((altitude / self.dem_band.max()) * self.map_mesh.z.max())
 
     def cleanup(self):
         """
