@@ -1,9 +1,11 @@
 import atexit
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 import gemgis as gg
 import geopandas as gpd
 import numpy as np
+from pyproj import Transformer
+import pyproj
 import rasterio
 from rasterio import features
 from rasterio.enums import Resampling
@@ -26,6 +28,7 @@ class Map:
         scale_factor: int = 1,
         data: dict = None,
         elevation_scale: float = 0.02,
+        height_plateau: float = 4,
     ):
         """
         Constructor for the Map class.
@@ -40,6 +43,8 @@ class Map:
             Dictionary containing the data to load. Default is None.
         elevation_scale : float, optional
             The scale factor to apply to the elevation values. Defaults to 0.02.
+        height_plateau : float, optional
+            The height of the plateau. Default is 4 (is given in mm).
         Notes
         -----
         If `data` is not None, it calls `load_from_data(data)`.
@@ -47,6 +52,10 @@ class Map:
         Registers `cleanup` to be called at exit.
         """
         if not data:
+            self.meshs = []
+            self.elevation_scale = elevation_scale
+            self.height_plateau = height_plateau
+
             self.raster, self.dem_band = load_raster_data(dem_filename, True)
             mem = rasterio.MemoryFile()
             mem = mem.open(**self.raster.profile.copy())
@@ -58,8 +67,6 @@ class Map:
 
             self.map_mesh = self.compute_dem_mesh(elevation_scale=elevation_scale)
 
-            self.meshs = []
-            self.elevation_scale = elevation_scale
         else:
             self.load_from_data(data)
 
@@ -71,6 +78,8 @@ class Map:
                 map_mesh=mesh.Mesh(self.map_mesh.data.copy()),
                 raster=self.copy_raster(),
                 meshs=[mesh.Mesh(mesh_.data.copy()) for mesh_ in self.meshs],
+                height_plateau=self.height_plateau,
+                elevation_scale=self.elevation_scale,
             )
         )
 
@@ -97,6 +106,8 @@ class Map:
         self.raster = data["raster"]
         self.dem_band = self.raster.read(1)
         self.meshs = data["meshs"]
+        self.elevation_scale = data["elevation_scale"]
+        self.height_plateau = data["height_plateau"]
 
     def copy_raster(self):
         """
@@ -180,8 +191,8 @@ class Map:
             desired_size=desired_size,
             elevation_scale=elevation_scale,
             z_scale=1,
-            z_offset=4,
-            **mapa_kwargs
+            z_offset=self.height_plateau,
+            **mapa_kwargs,
         )
         map3D_object = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
         for i, face in enumerate(faces):
