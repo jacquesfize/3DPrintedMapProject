@@ -10,8 +10,8 @@ import rasterio
 from rasterio import features
 from rasterio.enums import Resampling
 from stl import mesh
-from utils import extrude_geometries, extrude_text, load_raster_data, parse_Mesh_to_PolyData
-from basic_mesh import generate_cube
+from .utils import extrude_geometries, extrude_text, load_raster_data, parse_Mesh_to_PolyData
+from .basic_mesh import generate_cube
 import mapa
 
 
