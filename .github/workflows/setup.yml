@@ -1,0 +1,31 @@
+name: Setup
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          # Install pip and pipx
+          python -m pip install --upgrade pip
+
+          # Use pip to install m4py in an isolated environment
+          pip install .
+
+      - name: Test installation
+        run: |
+          python -c "import m4py"
