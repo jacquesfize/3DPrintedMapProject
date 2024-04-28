@@ -156,52 +156,6 @@ def extrude_geometries(
     return out_band
 
 
-def extrude_text_in_raster(
-    raster_dataset: rasterio.DatasetReader,
-    band: np.ndarray,
-    text_with_pos: List[Tuple[str, Tuple[float, float]]],
-    args_image_font: Iterable[Any] = [],
-    text_align: str = "left",
-    extrusion_height: int = 100,
-    upscale_factor: int = 1,
-):
-    """
-    Extrudes text into a raster dataset.
-
-    Parameters
-    ----------
-    raster_dataset : rasterio.DatasetReader
-        The raster dataset to extrude the text into.
-    band : np.ndarray
-        The band of the raster dataset to extrude the text into.
-    text_with_pos : List[Tuple[str, Tuple[float, float]]]
-        A list of tuples containing the text to extrude and its position in the raster dataset.
-    args_image_font : Iterable[Any], optional
-        Optional arguments for creating the image font. Default is an empty iterable.
-    text_align : str, optional
-        The alignment of the text in the raster dataset. Default is "left".
-    extrusion_height : int, optional
-        The height of the extrusion in meters. Default is 100.
-
-    Returns
-    -------
-    np.ndarray
-        The new raster band with the extruded text.
-    """
-    image: Image = Image.fromarray(band)
-    draw: ImageDraw = ImageDraw.Draw(image)
-    font: ImageFont = ImageFont.truetype(*args_image_font)
-
-    for text, (x, y), altitude in text_with_pos:
-        draw.text(
-            [i * upscale_factor for i in raster_dataset.index(x, y)],
-            text,
-            font=font,
-            align=text_align,
-            fill=altitude + extrusion_height,
-        )
-
-    return np.asarray(image)
 
 
 def extrude_text(
@@ -245,15 +199,12 @@ def extrude_text(
     xyz[-1] = 0
     xyz[0] = 0
     verts, faces, _, _ = marching_cubes(xyz, spacing=[extrusion_height / 3, 1, 1])
-    obj3D = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, f in enumerate(faces):
-        obj3D.vectors[i] = verts[f]
-
-    obj3D.rotate([0, 0, 1], np.deg2rad(90))
-    obj3D.rotate([1, 0, 0], np.deg2rad(90))
-    obj3D.rotate([0, 0, 1], np.deg2rad(90))
-    obj3D = clean_mesh(obj3D)
-    return obj3D
+    
+    faces = parse_faces_to_pyvista_faces_format(faces)
+    text3D = pv.PolyData(verts, faces)
+    text3D.rotate_y(90,inplace=True)
+    text3D.rotate_z(180,inplace=True)
+    return text3D
 
 
 def clean_mesh(_mesh: mesh.Mesh, radius: int = 1000) -> mesh.Mesh:
@@ -308,3 +259,23 @@ def parsePolydata_to_Mesh(_polydata: pv.PolyData) -> mesh.Mesh:
     for i, f in enumerate(faces):
         map3d.vectors[i] = points[f]
     return map3d
+
+
+def parse_faces_to_pyvista_faces_format(faces:np.ndarray) -> np.ndarray:
+    """
+    Convert a list of face indices to the format required by PyVista.
+
+    Parameters
+    ----------
+    faces : array-like
+        List of face indices.
+
+    Returns
+    -------
+    numpy.ndarray
+        The face indices in the format required by PyVista.
+    """
+    return np.hstack(
+        [(np.ones(len(faces), dtype=np.int32) * 3).reshape(-1, 1), faces], dtype=np.int32
+    )
+
