@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  setup:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install pip and pipx
+          # Install pip
           python -m pip install --upgrade pip
 
           # Use pip to install m4py in an isolated environment
