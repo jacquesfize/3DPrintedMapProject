@@ -1,23 +1,30 @@
 import atexit
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import geopandas as gpd
 import numpy as np
 from pyproj import Transformer
 import rasterio
 from rasterio.enums import Resampling
-from .utils import extrude_geometries, extrude_text, load_raster_data, parse_Mesh_to_PolyData,parse_faces_to_pyvista_faces_format
+from .models import Bounds,SIZE
+from .utils import extrude_geometries, extrude_text, load_raster_data, parse_faces_to_pyvista_faces_format
 import mapa
 import pyvista as pv
 
 
-class SIZE:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
 
 class Map:
+    """
+    Class use to create a 3DMap object
+    """
+    map_mesh:pv.PolyData # Contains the DEM (Digital Elevation Model) 3D mesh
+    meshes: List[pv.PolyData] # Contains the 3D mesh added to the map
+    elevation_scale: float # The scale factor to apply to the elevation values
+    height_plateau: float # The height of the plateau
+    raster: rasterio.DatasetReader # Raster dataset from which is extracted the DEM
+    dem_band: np.ndarray # The DEM (Digital Elevation Model) 2D array used to generate the `map_mesh`
+    
+    
     def __init__(
         self,
         dem_filename: str = "",
@@ -66,6 +73,7 @@ class Map:
         else:
             self.load_from_data(data)
 
+        self.bounds = Bounds(self.map_mesh)
         atexit.register(self.cleanup)
 
     def copy(self):
