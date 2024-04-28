@@ -213,7 +213,7 @@ def clean_mesh(_mesh: mesh.Mesh, radius: int = 1000) -> mesh.Mesh:
     return parsePolydata_to_Mesh(mesh_pyvista)
 
 
-def scale_mesh(mesh_to_scale, desired_width):
+def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
     """
     Scales the given mesh to have the specified desired width.
 
@@ -229,15 +229,12 @@ def scale_mesh(mesh_to_scale, desired_width):
     mesh.Mesh
         The scaled mesh.
     """
-    new_mesh = mesh.Mesh(mesh_to_scale.data.copy())
-    new_mesh.translate(-new_mesh.min_)
-    new_mesh.update_min()
+    new_mesh = mesh_to_scale.copy()
+    
+    new_mesh.translate(-new_mesh.points.min(axis=0))
 
-    scale_factor = desired_width / new_mesh.max_[0]
-    new_mesh.x *= scale_factor
-    new_mesh.y *= scale_factor
-    new_mesh.z *= scale_factor
-
+    scale_factor = desired_width / new_mesh.points.max(axis=0)[0]
+    new_mesh.scale([scale_factor, scale_factor, scale_factor],inplace=True)
     return new_mesh
 
 
