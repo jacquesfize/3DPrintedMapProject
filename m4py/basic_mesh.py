@@ -4,19 +4,18 @@ import pyvista as pv
 
 def generate_cube(width: int = 1) -> pv.PolyData:
     """
-    Generate a cube mesh.
+     Generate a cube mesh.
 
-    Parameters
-    ----------
-    width : int, optional
-        Width of the cube, by default 1.
+     Parameters
+     ----------
+     width : int, optional
+         Width of the cube, by default 1.
 
-    Returns
-    -------
-   pyvista.PolyData
-        The generated cube mesh.
+     Returns
+     -------
+    pyvista.PolyData
+         The generated cube mesh.
     """
-    
 
     return pv.Cube(x_length=width, y_length=width, z_length=width)
 
@@ -61,11 +60,10 @@ def generate_cylinder(num_points: int = 100, radius: float = 3, height: float = 
     pyvista.PolyData
         The generated cylinder mesh.
     """
-    return pv.Cylinder(direction=[0, 0, 1], radius=radius, height=height,resolution=num_points)
+    return pv.Cylinder(direction=[0, 0, 1], radius=radius, height=height, resolution=num_points)
 
 
-def generate_torus(ring_radius: float = 10, cross_section_radius: float = 5
-                   ) -> pv.PolyData:
+def generate_torus(ring_radius: float = 10, cross_section_radius: float = 5) -> pv.PolyData:
     """
     Generate a torus mesh.
 
@@ -82,5 +80,3 @@ def generate_torus(ring_radius: float = 10, cross_section_radius: float = 5
         The generated torus mesh.
     """
     return pv.ParametricTorus(ringradius=ring_radius, crosssectionradius=cross_section_radius)
-
-

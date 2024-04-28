@@ -6,25 +6,31 @@ import numpy as np
 from pyproj import Transformer
 import rasterio
 from rasterio.enums import Resampling
-from .models import Bounds,SIZE
-from .utils import extrude_geometries, extrude_text, load_raster_data, parse_faces_to_pyvista_faces_format
+from .models import Bounds, SIZE
+from .utils import (
+    extrude_geometries,
+    extrude_text,
+    load_raster_data,
+    parse_faces_to_pyvista_faces_format,
+)
 import mapa
 import pyvista as pv
-
 
 
 class Map:
     """
     Class use to create a 3DMap object
     """
-    map_mesh:pv.PolyData # Contains the DEM (Digital Elevation Model) 3D mesh
-    meshes: List[pv.PolyData] # Contains the 3D mesh added to the map
-    elevation_scale: float # The scale factor to apply to the elevation values
-    height_plateau: float # The height of the plateau
-    raster: rasterio.DatasetReader # Raster dataset from which is extracted the DEM
-    dem_band: np.ndarray # The DEM (Digital Elevation Model) 2D array used to generate the `map_mesh`
-    
-    
+
+    map_mesh: pv.PolyData  # Contains the DEM (Digital Elevation Model) 3D mesh
+    meshes: List[pv.PolyData]  # Contains the 3D mesh added to the map
+    elevation_scale: float  # The scale factor to apply to the elevation values
+    height_plateau: float  # The height of the plateau
+    raster: rasterio.DatasetReader  # Raster dataset from which is extracted the DEM
+    dem_band: (
+        np.ndarray
+    )  # The DEM (Digital Elevation Model) 2D array used to generate the `map_mesh`
+
     def __init__(
         self,
         dem_filename: str = "",
@@ -197,14 +203,14 @@ class Map:
             z_scale=1,
             z_offset=self.height_plateau,
             **mapa_kwargs,
-        ).reshape(-1,3)
-        
-        faces = np.arange(data_mesh.shape[0], dtype=np.int32).reshape(-1,3)
-        faces= parse_faces_to_pyvista_faces_format(faces)
+        ).reshape(-1, 3)
+
+        faces = np.arange(data_mesh.shape[0], dtype=np.int32).reshape(-1, 3)
+        faces = parse_faces_to_pyvista_faces_format(faces)
         map3D_object = pv.PolyData(data_mesh, faces)
-        
-        map3D_object.rotate_z(-90,inplace=True)
-        map3D_object.translate(-map3D_object.points.min(axis=0),inplace=True)
+
+        map3D_object.rotate_z(-90, inplace=True)
+        map3D_object.translate(-map3D_object.points.min(axis=0), inplace=True)
         return map3D_object
 
     def add_text(
@@ -263,23 +269,23 @@ class Map:
 
         # scale text to a given width
         scale_factor_xy = text_width / tmax_x
-        
+
         # scale text to a given altitude
         altitude = int(
             (altitude / self.dem_band.max()) * mmax_z
         )  # scale altitude to max z position in the map mesh
         scale_factor_z = altitude / tmax_z
 
-        text_3D.scale([scale_factor_xy, scale_factor_xy, scale_factor_z],inplace=True)
+        text_3D.scale([scale_factor_xy, scale_factor_xy, scale_factor_z], inplace=True)
         # translate text to the bottom left corner
-        text_3D.translate(-text_3D.points.min(axis=0),inplace=True)
+        text_3D.translate(-text_3D.points.min(axis=0), inplace=True)
         # get the x,y raster coords from the world coords
         if not raster_coords:
             x, y = self.realworld_to_raster_coords((x, y), epsg_src=epsg_src)
         # move the text to the given coordinates
-        
-        text_3D.translate([x,mmax_y-y, mmax_z / 15],inplace=True)
-        
+
+        text_3D.translate([x, mmax_y - y, mmax_z / 15], inplace=True)
+
         if inplace:
             self.meshes.append(text_3D)
         else:
@@ -334,9 +340,9 @@ class Map:
         mmax_x, mmax_y, mmax_z = self.map_mesh.points.max(axis=0)
         # scale text to a given altitude
         mesh_to_add = mesh_to_add.copy()
-        mesh_to_add.translate(-mesh_to_add.points.min(axis=0),inplace=True)
+        mesh_to_add.translate(-mesh_to_add.points.min(axis=0), inplace=True)
 
-        mesh_to_add.translate([y, mmax_y - x, altitude],inplace=True)
+        mesh_to_add.translate([y, mmax_y - x, altitude], inplace=True)
 
         if inplace:
             self.meshes.append(mesh_to_add)
@@ -470,9 +476,8 @@ class Map:
         pv.PolyData
             A new mesh containing the data of all the meshes of the map and its plates.
         """
-        new_mesh:pv.PolyData = self.map_mesh.copy()
-        return new_mesh.merge(self.meshes,inplace=True)
-
+        new_mesh: pv.PolyData = self.map_mesh.copy()
+        return new_mesh.merge(self.meshes, inplace=True)
 
     def save(self, filename: str):
         """

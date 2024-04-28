@@ -155,8 +155,6 @@ def extrude_geometries(
     return out_band
 
 
-
-
 def extrude_text(
     text: str,
     font_path: str,
@@ -198,12 +196,12 @@ def extrude_text(
     xyz[-1] = 0
     xyz[0] = 0
     verts, faces, _, _ = marching_cubes(xyz, spacing=[extrusion_height / 3, 1, 1])
-    
+
     faces = parse_faces_to_pyvista_faces_format(faces)
     text3D = pv.PolyData(verts, faces)
-    text3D.rotate_y(90,inplace=True)
-    text3D.rotate_z(180,inplace=True)
-    text3D.rotate_x(180,inplace=True)
+    text3D.rotate_y(90, inplace=True)
+    text3D.rotate_z(180, inplace=True)
+    text3D.rotate_x(180, inplace=True)
     return text3D
 
 
@@ -211,7 +209,7 @@ def clean_mesh(_mesh: pv.PolyData, radius: int = 1000) -> pv.PolyData:
     return _mesh.fill_holes(radius)
 
 
-def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
+def scale_mesh(mesh_to_scale: pv.PolyData, desired_width: float) -> pv.PolyData:
     """
     Scales the given mesh to have the specified desired width.
 
@@ -228,15 +226,15 @@ def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
         The scaled mesh.
     """
     new_mesh = mesh_to_scale.copy()
-    
+
     new_mesh.translate(-new_mesh.points.min(axis=0))
 
     scale_factor = desired_width / new_mesh.points.max(axis=0)[0]
-    new_mesh.scale([scale_factor, scale_factor, scale_factor],inplace=True)
+    new_mesh.scale([scale_factor, scale_factor, scale_factor], inplace=True)
     return new_mesh
 
 
-def parse_faces_to_pyvista_faces_format(faces:np.ndarray) -> np.ndarray:
+def parse_faces_to_pyvista_faces_format(faces: np.ndarray) -> np.ndarray:
     """
     Convert a list of face indices to the format required by PyVista.
 
@@ -253,4 +251,3 @@ def parse_faces_to_pyvista_faces_format(faces:np.ndarray) -> np.ndarray:
     return np.hstack(
         [(np.ones(len(faces), dtype=np.int32) * 3).reshape(-1, 1), faces], dtype=np.int32
     )
-
