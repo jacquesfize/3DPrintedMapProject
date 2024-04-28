@@ -1,5 +1,5 @@
 import os
-from typing import Any, Iterable, List, Tuple, Union
+from typing import Iterable, List, Tuple
 
 import geopandas as gpd
 import numpy as np
@@ -11,7 +11,6 @@ from rasterio import features
 from shapely import Point, Polygon
 from shapely.geometry.base import BaseGeometry
 from skimage.measure import marching_cubes
-from stl import mesh
 from tqdm.notebook import tqdm
 
 
@@ -163,7 +162,7 @@ def extrude_text(
     font_path: str,
     font_size: int = 40,
     extrusion_height: int = 100,
-) -> mesh.Mesh:
+) -> pv.PolyData:
     """
     Extrudes a text into a 3D mesh.
 
@@ -184,7 +183,7 @@ def extrude_text(
 
     Returns
     -------
-    mesh.Mesh
+    pv.PolyData
         The extruded 3D mesh.
     """
     fnt = ImageFont.truetype(font_path, font_size)
@@ -204,13 +203,12 @@ def extrude_text(
     text3D = pv.PolyData(verts, faces)
     text3D.rotate_y(90,inplace=True)
     text3D.rotate_z(180,inplace=True)
+    text3D.rotate_x(180,inplace=True)
     return text3D
 
 
-def clean_mesh(_mesh: mesh.Mesh, radius: int = 1000) -> mesh.Mesh:
-    mesh_pyvista = parse_Mesh_to_PolyData(_mesh)
-    mesh_pyvista = mesh_pyvista.fill_holes(radius)
-    return parsePolydata_to_Mesh(mesh_pyvista)
+def clean_mesh(_mesh: pv.PolyData, radius: int = 1000) -> pv.PolyData:
+    return _mesh.fill_holes(radius)
 
 
 def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
@@ -226,7 +224,7 @@ def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
 
     Returns
     -------
-    mesh.Mesh
+    pyvista.PolyData
         The scaled mesh.
     """
     new_mesh = mesh_to_scale.copy()
@@ -236,26 +234,6 @@ def scale_mesh(mesh_to_scale:pv.PolyData, desired_width:float) -> pv.PolyData:
     scale_factor = desired_width / new_mesh.points.max(axis=0)[0]
     new_mesh.scale([scale_factor, scale_factor, scale_factor],inplace=True)
     return new_mesh
-
-
-def parse_Mesh_to_PolyData(_mesh: mesh.Mesh) -> pv.PolyData:
-    points = _mesh.vectors.reshape(-1, 3)
-    faces = np.arange(points.shape[0], dtype=np.uint32).reshape(-1, 3)
-    faces = np.hstack(
-        [(np.ones(len(faces), dtype=np.uint32) * 3).reshape(-1, 1), faces], dtype=np.uint32
-    )
-    cloud = pv.PolyData(points, faces)
-    return cloud
-
-
-def parsePolydata_to_Mesh(_polydata: pv.PolyData) -> mesh.Mesh:
-    _polydata = _polydata.triangulate()
-    faces = _polydata.faces.reshape(-1, 4)[:, 1:4]
-    points = _polydata.points
-    map3d = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, f in enumerate(faces):
-        map3d.vectors[i] = points[f]
-    return map3d
 
 
 def parse_faces_to_pyvista_faces_format(faces:np.ndarray) -> np.ndarray:

@@ -1,6 +1,5 @@
 import numpy as np
 import pyvista as pv
-from .utils import scale_mesh
 
 
 def generate_cube(width: int = 1) -> pv.PolyData:
